@@ -1,0 +1,8 @@
+# Backup files created by nftablets
+*.rules
+*.backup.*
+
+# Editor
+*.swp
+*~
+.DS_Store

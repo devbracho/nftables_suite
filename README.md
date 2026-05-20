@@ -311,6 +311,3 @@ ssh alert-server "/usr/local/bin/send-alert-email.sh 'Test Alert' 'Testing from 
 1. Edit `/etc/nftables.d/policy.conf`
 2. Add username to appropriate `members=` line
 3. Apply firewall: `sudo /usr/sbin/nftablets.suite.sh`
-
-# nftables_suite
-# nftables_suite

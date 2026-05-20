@@ -1,0 +1,16 @@
+[Unit]
+Description=Refresh nftables rules from policy (domain snapshot update)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+Environment=NFTABLES_POLICY_FILE=/etc/nftables.d/policy.conf
+# Validate then apply; comment the first ExecStart if you prefer only apply
+ExecStart=/usr/sbin/nftablets.suite.sh --dry-run
+ExecStart=/usr/sbin/nftablets.suite.sh
+# Alternatively, enable auto-rollback window by using:
+# ExecStart=/usr/sbin/nftablets.suite.sh --safe-apply 120
+
+[Install]
+WantedBy=multi-user.target
