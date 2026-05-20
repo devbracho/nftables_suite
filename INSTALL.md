@@ -22,7 +22,7 @@ The `install.sh` script automates the installation of the nftablets firewall sui
 Always preview what will be changed before committing:
 
 ```bash
-cd scripts/nft-firewall/
+cd nftables_suite
 sudo ./install.sh --dry-run
 ```
 

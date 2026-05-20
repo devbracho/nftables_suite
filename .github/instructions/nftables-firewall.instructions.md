@@ -15,7 +15,7 @@ All personal usernames in policy files, scripts, and documentation must use anon
 - **Keep** system/service accounts as-is: `root`, `_apt`, `promtail`, `git`, `gitlab-runner`, `gitlab-www`
 - Replace organisation/project names with generic equivalents (`myorg`, `nftables`)
 - Replace personal email addresses — the one exception is the alert destination: `devbracho@gmail.com`
-- Use `/path/to/nftables` for installation path references in documentation
+- Use `/path/to/nftables_suite` for installation path references in documentation
 
 ## policy.conf: Single Source of Truth
 
@@ -76,6 +76,6 @@ All `.sh` scripts must be installed with `chmod 755`.
 
 ## Documentation Style
 
-- Use `/path/to/nftables` for all installation path examples
-- Use `github.com/myorg/nftables` for repository URL examples
+- Use `/path/to/nftables_suite` for all installation path examples
+- Use `github.com/devbracho/nftables_suite` as the canonical repository URL
 - Inline `users=` lists in service stanzas should reference only the minimal set of users that need that specific service

@@ -7,7 +7,7 @@
  - Defaults: inbound DROP (allow via services), outbound DROP (allow via per‑user egress).
 
 ### Prerequisites
- - Run as root (e.g., `sudo ./nftablets.suite.sh ...`).
+ - Run as root (e.g., `sudo nftablets.suite.sh ...`).
  - Packages:
 	 - `nftables` (provides `nft`)
 	 - `dnsutils` (or equivalent, provides `dig`) for domain resolution
@@ -168,38 +168,86 @@ sudo systemctl list-timers | grep nftablets-refresh || true
  - Domain resolution: allow‑lists/block‑lists are snapshots at apply time; CDNs and fast‑changing IPs may need periodic re‑apply or broader IP ranges.
  - Containers/daemons: egress matching uses process UID (`meta skuid`). Ensure the UID reflects the process initiating network connections.
  - Other managers: disable or coordinate with `ufw`, `firewalld`, or `netfilter-persistent` to avoid conflicts.
-## Alerts & Maintenance
+## Git Access Control Wrapper
 
-### Multi-Machine Email Relay
+### Overview
+Application-level git access control that complements firewall rules to:
+- Allow GitHub Copilot authentication while blocking repository cloning via HTTPS
+- Permit SSH-based GitHub access for specific users
+- Enforce internal GitLab-only access for restricted users
 
-**For machines using SSH relay to the alert server:**
+### Components
+- `/usr/local/bin/git-access-control` - Main wrapper script
+- `/etc/profile.d/git-access-control.sh` - Shell integration for controlled users
+- `/usr/local/bin/install-git-wrapper.sh` - Installer
+- `/usr/local/bin/uninstall-git-wrapper.sh` - Uninstaller
 
-1. **Install email relay helper on the alert server**:
+### User Groups
+
+**[group:open]** - Fully unrestricted
+- Members: `root, user1, user2, _apt, promtail, git`
+- No firewall or git restrictions
+
+**[group:ssh_github]** - GitHub SSH + Copilot
+- Members: `user3, user14, user15`
+- Firewall: Allows SSH (port 22), HTTPS (443) to GitHub IP ranges
+- Git wrapper: Blocks HTTPS git clone/push, allows SSH git operations
+- Access: GitHub Copilot, SSH clone
+
+**[group:ai_tools]** - AI Tools Only
+- Members: `user17`
+- Firewall: Allows HTTPS (443, 8080) but NO SSH (port 22)
+- Git wrapper: Blocks all GitHub repository operations
+- Access: ChatGPT, Claude Sonnet, GitHub Copilot authentication only
+
+**[group:restricted]** - Internal Only
+- Members: `user4, user5, user6, user7, user8, user9, user10, user11, user12, user13`
+- Firewall: Allows internal networks only (192.168.1.0/24, 10.66.66.0/24)
+- Git wrapper: Blocks external GitHub
+- Access: Internal GitLab, PyPI, Python.org (via CDN ranges)
+
+### Installation
+
 ```bash
-sudo install -m 0755 send-alert-email.sh /usr/local/bin/
+# Copy wrapper and configuration
+sudo cp /path/to/nftables/scripts/nft-firewall/git-access-control /usr/local/bin/
+sudo cp /path/to/nftables/scripts/nft-firewall/git-access-control.sh /etc/profile.d/
+sudo chmod +x /usr/local/bin/git-access-control
+
+# Users need to logout/login for alias to take effect
+# Or source manually:
+source /etc/profile.d/git-access-control.sh
 ```
 
-2. **Set up SSH keys from client machines to the alert server**:
-```bash
-# On the client machine (as root)
-ssh-keygen -t ed25519 -f /root/.ssh/id_email_relay -N ""
-ssh-copy-id -i /root/.ssh/id_email_relay root@alert-server
+### Policy Configuration
 
-# Test
-ssh alert-server "/usr/local/bin/send-alert-email.sh 'Test Alert' 'Testing from $(hostname)'"
+The policy file uses CIDR ranges to avoid DNS resolution conflicts:
+- `140.82.112.0/20` = github.com
+- `185.199.108.0/22` = GitHub Pages/CDN (githubassets, githubusercontent, pyenv.run)
+- `151.101.0.0/16` = Fastly CDN (GitHub, PyPI, Python.org)
+
+Example policy stanza:
+```ini
+[group:ssh_github]
+members=user3,user14,user15
+egress_policy=block_all
+egress_allow_domains=140.82.112.0/20,185.199.108.0/22,151.101.0.0/16,bitbucket.org,artefact.skao.int,google.com
+egress_allow_tcp_ports=22,80,443
 ```
 
-3. **Deploy security check script** - it auto-detects:
-   - If Alertmanager is reachable: posts alert directly
-   - If not: falls back to direct SMTP or SSH relay
+### Common Issues
 
-**Email configuration** (in `send-alert-email.sh`):
-- FROM: `noreply@example.com` (override via `EMAIL_FROM=`)
-- TO: `devbracho@gmail.com` (override via `EMAIL_TO=`)
+**GitHub domain resolution conflicts:**
+- GitHub uses multiple IPs that rotate
+- Solution: Use CIDR ranges instead of domain names in policy
+- The script resolves domains once at apply time
 
-### Maintenance
+**Git wrapper not active:**
+- Users must logout/login after installation
+- Or run: `source /etc/profile.d/git-access-control.sh`
+- Test with: `type git` (should show alias to wrapper)
 
-**Adding users to groups:**
-1. Edit `/etc/nftables.d/policy.conf`
-2. Add username to appropriate `members=` line
-3. Apply firewall: `sudo /usr/sbin/nftablets.suite.sh`
+**Browser can't access github.com:**
+- Firewall requires GitHub CDN ranges (185.199.108.0/22, 151.101.0.0/16)
+- Check logs: `tail -f /var/log/nftables/attempts.log`
+- Verify IPs: `sudo nft list set inet firewall u_user_USERNAME_egress_ips`

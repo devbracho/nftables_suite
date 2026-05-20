@@ -46,8 +46,8 @@ Use `policy.conf.base` which excludes the `[forward:grafana]` section.
 
 4. Copy to repository for version control:
    ```bash
-   sudo cp /etc/nftables.d/policy.conf.<hostname> /path/to/nftables/scripts/nft-firewall/policy-configs/
-   sudo chown user3:user3 /path/to/nftables/scripts/nft-firewall/policy-configs/policy.conf.<hostname>
+   sudo cp /etc/nftables.d/policy.conf.<hostname> /path/to/nftables_suite/policy-configs/
+   sudo chown $USER:$USER /path/to/nftables_suite/policy-configs/policy.conf.<hostname>
    ```
 
 5. Commit to repository
@@ -68,6 +68,6 @@ All policy files are tracked in the git repository. When making changes:
 
 1. Edit the machine-specific file in `/etc/nftables.d/`
 2. Test the configuration
-3. Copy to repository: `sudo cp /etc/nftables.d/policy.conf.<hostname> /path/to/nftables/scripts/nft-firewall/policy-configs/`
-4. Fix ownership: `sudo chown user3:user3 /path/to/nftables/scripts/nft-firewall/policy-configs/*`
+3. Copy to repository: `sudo cp /etc/nftables.d/policy.conf.<hostname> /path/to/nftables_suite/policy-configs/`
+4. Fix ownership: `sudo chown $USER:$USER /path/to/nftables_suite/policy-configs/*`
 5. Commit and push changes

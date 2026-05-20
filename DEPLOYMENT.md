@@ -21,10 +21,9 @@ sudo apt-get update
 sudo apt-get install -y nftables dnsutils rsyslog git
 
 # Clone repository
-cd /path/to/nftables
-git clone https://github.com/myorg/nftables.git
+git clone https://github.com/devbracho/nftables_suite.git
 # OR if already cloned:
-cd /path/to/nftables/nftables && git pull origin main
+cd nftables_suite && git pull origin main
 ```
 
 ### On Alert Server (email relay host)
@@ -40,14 +39,14 @@ sudo /usr/local/bin/send-alert-email.sh "Test from $(hostname)" "Testing email r
 ### Step 1: Deploy Firewall
 
 ```bash
-cd /path/to/nftables/nftables
+cd nftables_suite
 
 # Install nftablets.suite.sh
-sudo install -m 0755 scripts/nft-firewall/nftablets.suite.sh /usr/sbin/nftablets.suite.sh
+sudo install -m 0755 nftablets.suite.sh /usr/sbin/nftablets.suite.sh
 
 # Copy policy configuration (IMPORTANT: Review and customize for this machine!)
 sudo mkdir -p /etc/nftables.d
-sudo cp scripts/nft-firewall/policy.conf /etc/nftables.d/policy.conf
+sudo cp policy.conf /etc/nftables.d/policy.conf
 
 # CUSTOMIZE POLICY: Edit for this machine's users
 sudo vim /etc/nftables.d/policy.conf
@@ -205,12 +204,12 @@ sudo ssh alert-server "echo SSH working"
 
 ## 📖 Additional Documentation
 
-- [README.md](/path/to/nftables/scripts/nft-firewall/README.md) - Full technical documentation
+- [README.md](https://github.com/devbracho/nftables_suite/blob/main/README.md) - Full technical documentation
 - [policy.conf](/etc/nftables.d/policy.conf) - Current firewall configuration
-- [Main README](/path/to/nftables/README.md) - Infrastructure overview
+- [INSTALL.md](https://github.com/devbracho/nftables_suite/blob/main/INSTALL.md) - Installation guide
 
 ---
 
 **Last Updated**: 2026-01-15  
 **Tested On**: Ubuntu 20.04  
-**Repository**: https://github.com/myorg/nftables (main branch)
+**Repository**: https://github.com/devbracho/nftables_suite (main branch)
