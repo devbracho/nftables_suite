@@ -206,7 +206,6 @@ sudo ssh alert-server "echo SSH working"
 
 - [README.md](https://github.com/devbracho/nftables_suite/blob/main/README.md) - Full technical documentation
 - [policy.conf](/etc/nftables.d/policy.conf) - Current firewall configuration
-- [INSTALL.md](https://github.com/devbracho/nftables_suite/blob/main/INSTALL.md) - Installation guide
 
 ---
 
