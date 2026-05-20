@@ -2,6 +2,9 @@
 *.rules
 *.backup.*
 
+# GitHub/IDE metadata
+.github/
+
 # Editor
 *.swp
 *~
