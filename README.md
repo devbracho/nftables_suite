@@ -1,66 +1,13 @@
 ## nftablets.suite.sh
 
 ### Overview
- - Generates and applies an nftables ruleset from a plain-text policy (`/etc/nftables.d/policy.conf` by default).
- - Performs syntax validation, takes backups, and configures logging before activating changes.
- - Supports dry runs and status reporting so you can inspect rule output without touching the live firewall.
-
-### Prerequisites
- - Run as root (`sudo scripts/iptables/nftablets.suite.sh ...`).
- - `nft` binary available (package `nftables`).
- - `rsyslog` optional but recommended for capturing log prefixes (`NFT-CONN`, `NFT-ATTEMPT`).
- - Policy file readable by root; directory writable when using `--init-config`.
-
-### CLI Options
- - `--dry-run` Validates the policy and renders the batch ruleset without applying it.
- - `--status` Shows the current nftables ruleset, listening sockets, interface summary, and log tail.
- - `--init-config` Creates the default policy template if it is missing.
- - `--help` Prints the usage synopsis.
-
-### Policy Format
- - Services are declared in INI-like stanzas (`[service-name]`).
- - Keys accept comma-separated values (whitespace ignored).
- - Recognized keys:
-	 - `tcp_ports`, `udp_ports`: single ports (`22`) or ascending ranges (`5900-5920`).
-	 - `sources`: IPv4 CIDRs (`192.168.1.0/24`).
-	 - `users`: usernames or numeric user IDs to restrict socket owner.
-	 - `log_prefix`: optional prefix for accept-logs (default `NFT-CONN <service> allow`).
- - Example: `scripts/iptables/nftablets.policy.conf`.
-
-### Workflow
- 1. Copy the automation helpers into your path for system-wide use, e.g.
-		- `sudo install -m 0755 scripts/iptables/nftablets.suite.sh /usr/sbin/nftablets.suite.sh`
-		- `sudo install -m 0755 scripts/iptables/nftablets_discover.py /usr/sbin/nftablets-discover`
- 2. `sudo nftablets.suite.sh --dry-run` confirms the policy parses and `nft -c` accepts the render.
- 3. Review the generated rules (dry-run output) or run `sudo nft list ruleset` after applying.
- 4. Apply live: `sudo nftablets.suite.sh`.
- 5. Persist ruleset (handled automatically by writing `/etc/nftables.conf` and touching `nftables.service`).
-
-### Logging & Backups
- - Drop and accept events log under `/var/log/nftables/` once `rsyslog` reloads.
- - Existing ruleset is backed up to `/root/nftables.backup.<timestamp>.rules` before changes.
-
-### Discovering Current Listeners
- - Generate policy suggestions from active sockets: `sudo scripts/iptables/nftablets_discover.py` (or the installed path such as `sudo nftablets-discover`).
- - Redirect output to append/update the policy file, e.g. `sudo nftablets-discover >> /etc/nftables.d/policy.conf` (review before appending).
- - After adding new entries, run `sudo nftablets.suite.sh --dry-run` to validate before applying live.
- - Review the proposed stanzas, adjust `sources`/`log_prefix`, then append to `/etc/nftables.d/policy.conf`.
- - Rerun `sudo nftablets.suite.sh --dry-run` to validate before applying live.
-
-### Troubleshooting
- - Port validation failures are reported with the offending service and field.
- - Ensure ranges are ascending and inside `1-65535`.
-
-## nftablets.suite.sh
-
-### Overview
  - Generates and applies an nftables ruleset from a plain‑text policy (`/etc/nftables.d/policy.conf` by default).
  - Validates syntax, takes backups, configures logging, and applies atomically.
  - Supports dry runs, safe‑apply with auto‑rollback, and a status report (rules, sockets, interfaces, logs).
  - Defaults: inbound DROP (allow via services), outbound DROP (allow via per‑user egress).
 
 ### Prerequisites
- - Run as root (e.g., `sudo ./scripts/nft-firewall/nftablets.suite.sh ...`).
+ - Run as root (e.g., `sudo ./nftablets.suite.sh ...`).
  - Packages:
 	 - `nftables` (provides `nft`)
 	 - `dnsutils` (or equivalent, provides `dig`) for domain resolution
@@ -69,10 +16,10 @@
 
 ### Install
  ```bash
- sudo install -m 0755 scripts/nft-firewall/nftablets.suite.sh /usr/sbin/nftablets.suite.sh
-sudo install -m 0755 scripts/nft-firewall/nftablets_discover.py /usr/sbin/nftablets-discover
+ sudo install -m 0755 nftablets.suite.sh /usr/sbin/nftablets.suite.sh
+sudo install -m 0755 nftablets_discover.py /usr/sbin/nftablets-discover
  sudo mkdir -p /etc/nftables.d
- sudo install -m 0644 scripts/nft-firewall/nftablets.policy.conf /etc/nftables.d/policy.conf
+ sudo install -m 0644 policy.conf /etc/nftables.d/policy.conf
  ```
  Debian/Ubuntu dependencies:
  ```bash
@@ -82,8 +29,8 @@ sudo install -m 0755 scripts/nft-firewall/nftablets_discover.py /usr/sbin/nftabl
 
 Install auto-refresh timer (optional but recommended for domain snapshots):
 ```bash
-sudo install -m 0644 scripts/nft-firewall/systemd/nftablets-refresh.service /etc/systemd/system/nftablets-refresh.service
-sudo install -m 0644 scripts/nft-firewall/systemd/nftablets-refresh.timer /etc/systemd/system/nftablets-refresh.timer
+sudo install -m 0644 systemd/nftablets-refresh.service /etc/systemd/system/nftablets-refresh.service
+sudo install -m 0644 systemd/nftablets-refresh.timer /etc/systemd/system/nftablets-refresh.timer
 sudo systemctl daemon-reload
 sudo systemctl enable --now nftablets-refresh.timer
 sudo systemctl list-timers | grep nftablets-refresh || true
@@ -221,61 +168,6 @@ sudo systemctl list-timers | grep nftablets-refresh || true
  - Domain resolution: allow‑lists/block‑lists are snapshots at apply time; CDNs and fast‑changing IPs may need periodic re‑apply or broader IP ranges.
  - Containers/daemons: egress matching uses process UID (`meta skuid`). Ensure the UID reflects the process initiating network connections.
  - Other managers: disable or coordinate with `ufw`, `firewalld`, or `netfilter-persistent` to avoid conflicts.
-## nftablets.suite.sh
-
-### Overview
-- Generates and applies an nftables ruleset from a plain-text policy (`/etc/nftables.d/policy.conf` by default).
-- Performs syntax validation, takes backups, and configures logging before activating changes.
-- Supports dry runs and status reporting so you can inspect rule output without touching the live firewall.
-
-### Prerequisites
-- Run as root (`sudo scripts/iptables/nftablets.suite.sh ...`).
-- `nft` binary available (package `nftables`).
-- `rsyslog` optional but recommended for capturing log prefixes (`NFT-CONN`, `NFT-ATTEMPT`).
-- Policy file readable by root; directory writable when using `--init-config`.
-
-### CLI Options
-- `--dry-run` Validates the policy and renders the batch ruleset without applying it.
-- `--status` Shows the current nftables ruleset, listening sockets, interface summary, and log tail.
-- `--init-config` Creates the default policy template if it is missing.
-- `--help` Prints the usage synopsis.
-
-### Policy Format
-- Services are declared in INI-like stanzas (`[service-name]`).
-- Keys accept comma-separated values (whitespace ignored).
-- Recognized keys:
-	- `tcp_ports`, `udp_ports`: single ports (`22`) or ascending ranges (`5900-5920`).
-	- `sources`: IPv4 CIDRs (`192.168.1.0/24`).
-	- `users`: usernames or numeric user IDs to restrict socket owner.
-	- `log_prefix`: optional prefix for accept-logs (default `NFT-CONN <service> allow`).
-- Example: `scripts/iptables/nftablets.policy.conf`.
-
-### Workflow
-1. Copy the automation helpers into your path for system-wide use, e.g.
-	- `sudo install -m 0755 scripts/iptables/nftablets.suite.sh /usr/sbin/nftablets.suite.sh`
-	- `sudo install -m 0755 scripts/iptables/nftablets_discover.py /usr/sbin/nftablets-discover`
-2. `sudo nftablets.suite.sh --dry-run` confirms the policy parses and `nft -c` accepts the render.
-3. Review the generated rules (dry-run output) or run `sudo nft list ruleset` after applying.
-4. Apply live: `sudo nftablets.suite.sh`.
-5. Persist ruleset (handled automatically by writing `/etc/nftables.conf` and touching `nftables.service`).
-
-### Logging & Backups
-- Drop and accept events log under `/var/log/nftables/` once `rsyslog` reloads.
-- Existing ruleset is backed up to `/root/nftables.backup.<timestamp>.rules` before changes.
-
-### Discovering Current Listeners
-- Generate policy suggestions from active sockets: `sudo scripts/iptables/nftablets_discover.py` (or the installed path such as `sudo nftablets-discover`).
-- Redirect output to append/update the policy file, e.g. `sudo nftablets-discover >> /etc/nftables.d/policy.conf` (review before appending).
-- After adding new entries, run `sudo nftablets.suite.sh --dry-run` to validate before applying live.
-- Review the proposed stanzas, adjust `sources`/`log_prefix`, then append to `/etc/nftables.d/policy.conf`.
-- Rerun `sudo nftablets.suite.sh --dry-run` to validate before applying live.
-
-### Troubleshooting
-- Port validation failures are reported with the offending service and field.
-- Ensure ranges are ascending and inside `1-65535`.
-
----
-
 ## Alerts & Maintenance
 
 ### Multi-Machine Email Relay
@@ -284,7 +176,7 @@ sudo systemctl list-timers | grep nftablets-refresh || true
 
 1. **Install email relay helper on the alert server**:
 ```bash
-sudo install -m 0755 scripts/nft-firewall/send-alert-email.sh /usr/local/bin/
+sudo install -m 0755 send-alert-email.sh /usr/local/bin/
 ```
 
 2. **Set up SSH keys from client machines to the alert server**:
