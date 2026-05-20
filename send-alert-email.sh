@@ -9,7 +9,7 @@
 
 # --- Recipients ---
 EMAIL_FROM="${EMAIL_FROM:-noreply@example.com}"
-EMAIL_TO="${EMAIL_TO:-devbracho@gmail.com}"
+EMAIL_TO="${EMAIL_TO:-mailexample@gmail.com}"
 
 # --- Alertmanager (preferred) ---
 ALERTMANAGER_URL="${ALERTMANAGER_URL:-http://localhost:9093}"

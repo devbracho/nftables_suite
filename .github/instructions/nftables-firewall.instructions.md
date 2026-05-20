@@ -14,13 +14,12 @@ All personal usernames in policy files, scripts, and documentation must use anon
 - Substitute real usernames with `user1`, `user2`, ... `userN`
 - **Keep** system/service accounts as-is: `root`, `_apt`, `promtail`, `git`, `gitlab-runner`, `gitlab-www`
 - Replace organisation/project names with generic equivalents (`myorg`, `nftables`)
-- Replace personal email addresses — the one exception is the alert destination: `devbracho@gmail.com`
+- Replace personal email addresses — the one exception is the alert destination: `mailexample@gmail.com`
 - Use `/path/to/nftables_suite` for installation path references in documentation
 
 ## policy.conf: Single Source of Truth
 
 - There is one policy file: `policy.conf`. Do not create machine-specific variants in the project root.
-- Machine-specific configs belong in `policy-configs/` and must not duplicate the root file.
 - Keep 5 representative example users covering all 4 tiers (see below). Do not inflate membership lists.
 
 ## User Tier Model
@@ -67,7 +66,7 @@ Never use bare `nftablets.suite.sh` (without `--dry-run` or `--safe-apply`) for 
 
 ## Alert Email
 
-The default alert recipient is `devbracho@gmail.com`. Do not replace this with a placeholder.
+The default alert recipient is `mailexample@gmail.com`. Do not replace this with a placeholder.
 The sender (`EMAIL_FROM`) should use a project-appropriate address — `noreply@example.com` is acceptable if no real domain is configured.
 
 ## Script Permissions

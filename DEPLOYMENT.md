@@ -8,7 +8,7 @@ This guide covers deploying the nftables firewall suite on Linux.
 ## 🎯 What Gets Deployed
 
 1. **nftables Firewall** - Group-based egress control (ai_tools_full, ai_tools_basic, restricted)
-2. **Email Alerts** - Violations sent to devbracho@gmail.com via Alertmanager / SMTP
+2. **Email Alerts** - Violations sent to mailexample@gmail.com via Alertmanager / SMTP
 
 ---
 
