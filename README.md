@@ -276,233 +276,34 @@ sudo systemctl list-timers | grep nftablets-refresh || true
 
 ---
 
-## Git Access Control Wrapper
-
-### Overview
-Application-level git access control that complements firewall rules to:
-- Allow GitHub Copilot authentication while blocking repository cloning via HTTPS
-- Permit SSH-based GitHub access for specific users
-- Enforce internal GitLab-only access for restricted users
-
-### Components
-- `/usr/local/bin/git-access-control` - Main wrapper script
-- `/etc/profile.d/git-access-control.sh` - Shell integration for controlled users
-- `/usr/local/bin/install-git-wrapper.sh` - Installer
-- `/usr/local/bin/uninstall-git-wrapper.sh` - Uninstaller
-
-### User Groups
-
-**[group:open]** - Fully unrestricted
-- Members: `root, user1, user2, _apt, promtail, git`
-- No firewall or git restrictions
-
-**[group:ssh_github]** - GitHub SSH + Copilot
-- Members: `user3, user14, user15`
-- Firewall: Allows SSH (port 22), HTTPS (443) to GitHub IP ranges
-- Git wrapper: Blocks HTTPS git clone/push, allows SSH git operations
-- Access: GitHub Copilot, SSH clone, internal GitLab
-
-**[group:ai_tools]** - AI Tools Only
-- Members: `user17`
-- Firewall: Allows HTTPS (443, 8080) but NO SSH (port 22)
-- Git wrapper: Blocks all GitHub repository operations
-- Access: ChatGPT, Claude Sonnet, GitHub Copilot authentication only
-
-**[group:restricted]** - Internal Only
-- Members: `user4, user5, user6, user7, user8, user9, user10, user11, user12, user13`
-- Firewall: Allows internal networks only (192.168.1.0/24, 10.66.66.0/24)
-- Git wrapper: Blocks external GitHub
-- Access: Internal GitLab, PyPI, Python.org (via CDN ranges)
-
-### Installation
-
-```bash
-# Copy wrapper and configuration
-sudo cp /path/to/nftables/scripts/nft-firewall/git-access-control /usr/local/bin/
-sudo cp /path/to/nftables/scripts/nft-firewall/git-access-control.sh /etc/profile.d/
-sudo chmod +x /usr/local/bin/git-access-control
-
-# Users need to logout/login for alias to take effect
-# Or source manually:
-source /etc/profile.d/git-access-control.sh
-```
-
-### Policy Configuration
-
-The policy file uses CIDR ranges to avoid DNS resolution conflicts:
-- `140.82.112.0/20` = github.com
-- `185.199.108.0/22` = GitHub Pages/CDN (githubassets, githubusercontent, pyenv.run)
-- `151.101.0.0/16` = Fastly CDN (GitHub, PyPI, Python.org)
-
-Example policy stanza:
-```ini
-[group:ssh_github]
-members=user3,user14,user15
-egress_policy=block_all
-egress_allow_domains=192.168.1.0/24,10.66.66.0/24,140.82.112.0/20,185.199.108.0/22,151.101.0.0/16,bitbucket.org,artefact.skao.int,google.com
-egress_allow_tcp_ports=22,80,443,8080
-```
-
-### Testing
-
-**For ssh_github users (user3, user14, user15):**
-```bash
-# Should BLOCK
-git clone https://github.com/user/repo.git
-
-# Should ALLOW
-git clone git@github.com:user/repo.git
-git clone git@192.168.1.11:group/project.git
-curl -I https://github.com/login  # Copilot auth
-```
-
-**For ai_tools users (user17):**
-```bash
-# Should BLOCK
-git clone https://github.com/user/repo.git
-git clone git@github.com:user/repo.git  # SSH blocked by firewall
-
-# Should ALLOW
-curl -I https://github.com/login  # Copilot auth
-curl -I https://chat.openai.com   # ChatGPT
-curl -I https://claude.ai         # Claude Sonnet
-```
-
-**For restricted users:**
-```bash
-# Should BLOCK
-curl -I https://github.com
-git clone https://github.com/user/repo.git
-
-# Should ALLOW
-git clone git@192.168.1.11:group/project.git
-curl -I https://pypi.org
-```
-
-### Common Issues
-
-**GitHub domain resolution conflicts:**
-- GitHub uses multiple IPs that rotate
-- Solution: Use CIDR ranges instead of domain names in policy
-- The script resolves domains once at apply time
-
-**Git wrapper not active:**
-- Users must logout/login after installation
-- Or run: `source /etc/profile.d/git-access-control.sh`
-- Test with: `type git` (should show alias to wrapper)
-
-**Browser can't access github.com:**
-- Firewall requires GitHub CDN ranges (185.199.108.0/22, 151.101.0.0/16)
-- Check logs: `tail -f /var/log/nftables/attempts.log`
-- Verify IPs: `sudo nft list set inet firewall u_user_USERNAME_egress_ips`
-
-### VS Code Integration
-
-**Problem**: VS Code may bypass the git wrapper by using system git directly
-
-**Solution**: Configure VS Code to use the wrapper explicitly
-
-```bash
-# For single user (e.g., user16)
-sudo -u user16 bash -c 'mkdir -p ~/.config/Code/User && cat > ~/.config/Code/User/settings.json << "EOF"
-{
-    "git.path": "/usr/local/bin/git-access-control"
-}
-EOF'
-
-# Apply to all controlled users
-for user in user14 user15 user16 user17 user4 user5 user6 user7 user8 user9 user10 user11 user12 user13; do
-    sudo -u "$user" bash -c 'mkdir -p ~/.config/Code/User && echo "{\"git.path\": \"/usr/local/bin/git-access-control\"}" > ~/.config/Code/User/settings.json' 2>/dev/null || echo "Skipped $user"
-done
-```
-
-**User must restart VS Code** after configuration change.
-
-**Verification:**
-```bash
-# Check if VS Code is using wrapper
-grep "git.path" ~/.config/Code/User/settings.json
-
-# Test in VS Code:
-# 1. Try cloning GitHub repo (should show ERROR from wrapper)
-# 2. Internal GitLab should still work
-```
-
-### Automated Security Checks
-
-**Purpose**: Detect and remediate users attempting to bypass git wrapper
-
-**Installation**:
-```bash
-# Install security check script
-sudo install -m 0755 scripts/nft-firewall/vscode-security-check.sh /usr/local/bin/
-
-# Install systemd timer (runs hourly)
-sudo install -m 0644 scripts/nft-firewall/systemd/vscode-security-check.service /etc/systemd/system/
-sudo install -m 0644 scripts/nft-firewall/systemd/vscode-security-check.timer /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now vscode-security-check.timer
-
-# Check timer status
-systemctl list-timers vscode-security-check.timer
-```
-
-**What it does**:
-- Checks all users in `ai_tools_full`, `ai_tools_basic`, `restricted` groups
-- Detects tampering (git.path changed to different binary)
-- Auto-corrects violations by restoring secure wrapper
-- Sends email alerts via GitLab SMTP for violations
-- Logs to `/var/log/vscode-security-check.log` and `/var/log/vscode-security-violations.log`
-- Runs every hour (OnCalendar=hourly)
-
-**Manual test**:
-```bash
-# Create violation
-sudo -u someuser bash -c 'echo "{\"git.path\": \"/usr/bin/git\"}" > ~/.config/Code/User/settings.json'
-
-# Run check
-sudo /usr/local/bin/vscode-security-check.sh
-
-# Should detect violation, fix it, and send email
-```
+## Alerts & Maintenance
 
 ### Multi-Machine Email Relay
 
-**For machines without GitLab** (pcw02lin, hp-probook):
+**For machines using SSH relay to the alert server:**
 
-1. **Install email relay helper on pcw01lin**:
+1. **Install email relay helper on the alert server**:
 ```bash
 sudo install -m 0755 scripts/nft-firewall/send-alert-email.sh /usr/local/bin/
 ```
 
-2. **Set up SSH keys from other machines to pcw01lin**:
+2. **Set up SSH keys from client machines to the alert server**:
 ```bash
-# On pcw02lin or hp-probook (as root)
+# On the client machine (as root)
 ssh-keygen -t ed25519 -f /root/.ssh/id_email_relay -N ""
-ssh-copy-id -i /root/.ssh/id_email_relay root@pcw01lin
+ssh-copy-id -i /root/.ssh/id_email_relay root@alert-server
 
 # Test
-ssh pcw01lin "/usr/local/bin/send-alert-email.sh 'Test Alert' 'Testing from $(hostname)'"
+ssh alert-server "/usr/local/bin/send-alert-email.sh 'Test Alert' 'Testing from $(hostname)'"
 ```
 
 3. **Deploy security check script** - it auto-detects:
-   - If on pcw01lin: uses local gitlab-rails
-   - If on other machine: SSH to pcw01lin and uses relay
+   - If Alertmanager is reachable: posts alert directly
+   - If not: falls back to direct SMTP or SSH relay
 
-4. **Deploy timer on all machines**:
-```bash
-# On each machine (pcw02lin, hp-probook)
-sudo install -m 0755 scripts/nft-firewall/vscode-security-check.sh /usr/local/bin/
-sudo install -m 0644 scripts/nft-firewall/systemd/vscode-security-check.service /etc/systemd/system/
-sudo install -m 0644 scripts/nft-firewall/systemd/vscode-security-check.timer /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now vscode-security-check.timer
-```
-
-**Email configuration** (in script):
-- FROM: `devbracho@gmail.com`
-- TO: `devbracho@gmail.com`
-- Change via environment: `EMAIL_FROM=... EMAIL_TO=... /usr/local/bin/vscode-security-check.sh`
+**Email configuration** (in `send-alert-email.sh`):
+- FROM: `noreply@example.com` (override via `EMAIL_FROM=`)
+- TO: `devbracho@gmail.com` (override via `EMAIL_TO=`)
 
 ### Maintenance
 
@@ -510,11 +311,6 @@ sudo systemctl enable --now vscode-security-check.timer
 1. Edit `/etc/nftables.d/policy.conf`
 2. Add username to appropriate `members=` line
 3. Apply firewall: `sudo /usr/sbin/nftablets.suite.sh`
-4. Configure VS Code (if applicable): `sudo -u USERNAME bash -c 'mkdir -p ~/.config/Code/User && echo "{\"git.path\": \"/usr/local/bin/git-access-control\"}" > ~/.config/Code/User/settings.json'`
-5. User logout/login (for shell alias) or restart VS Code
 
-**Removing git wrapper:**
-```bash
-sudo /usr/local/bin/uninstall-git-wrapper.sh
-```
+# nftables_suite
 # nftables_suite
